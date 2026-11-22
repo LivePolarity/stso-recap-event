@@ -68,3 +68,12 @@ Pour activer la page **Administration > Paramètres**, exécuter une seule fois 
 Cette migration ajoute des colonnes JSONB pour les futures fiches de production, les effectifs et les groupes, ainsi qu'une table `app_settings` réservée aux administrateurs. Elle ne supprime ni ne remplace les événements existants.
 
 La page Paramètres permet d'enregistrer le lien du Google Sheet. À ce stade, le lien est stocké dans Supabase, mais l'import automatique des lignes n'est pas encore activé : il faudra connecter le document réel et vérifier ses colonnes et ses droits de partage avant de mettre en place la synchronisation.
+
+
+## Nouvelle fiche événement (version enrichie)
+
+La fiche d'administration comprend maintenant cinq onglets : Général, Technique / production, Effectifs, Catering et Bar / loges. Les fiches groupes peuvent être saisies manuellement, avec calcul de leur effectif par catégorie. Le total événement additionne les groupes et l'effectif StSo. Le déroulé permet d'ajouter, supprimer et réordonner des lignes.
+
+Les champs supplémentaires sont enregistrés dans les colonnes JSONB `production`, `staffing` et `groups` ajoutées par `supabase/migration_v2.sql`. Si cette migration a déjà été exécutée sur le projet Supabase, il n'y a pas de nouvelle migration à lancer pour cette version.
+
+La connexion et la synchronisation Google Sheets ne sont pas encore actives : le lien enregistré dans Paramètres est conservé, mais les fiches groupes sont pour l'instant créées manuellement.
