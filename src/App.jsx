@@ -13,6 +13,25 @@ import {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
+async function fetchGroupsDirectory() {
+  if (!supabase) {
+    throw new Error('Connexion Supabase indisponible.')
+  }
+
+  const { data, error } = await supabase.functions.invoke(
+    'google-sheets-groups'
+  )
+
+  if (error) {
+    throw new Error(`Erreur de connexion au répertoire : ${error.message}`)
+  }
+
+  if (!data?.success || !Array.isArray(data.groups)) {
+    throw new Error('Le répertoire Google Sheets a renvoyé des données invalides.')
+  }
+
+  return data.groups
+}
 
 const emptyEvent = {
   title: '', event_date: format(new Date(), 'yyyy-MM-dd'), start_time: '', end_time: '',
@@ -145,6 +164,23 @@ function AdminForm({ initial, onSave, onCancel, busy }) {
     groups: Array.isArray(source.groups) ? source.groups : []
   }))
   const [section, setSection] = useState('general')
+  const [directoryGroups, setDirectoryGroups] = useState([])
+const [directoryLoading, setDirectoryLoading] = useState(false)
+const [directoryError, setDirectoryError] = useState('')
+
+async function loadGroupsDirectory() {
+  setDirectoryLoading(true)
+  setDirectoryError('')
+
+  try {
+    const groups = await fetchGroupsDirectory()
+    setDirectoryGroups(groups)
+  } catch (error) {
+    setDirectoryError(error.message || 'Erreur lors du chargement.')
+  } finally {
+    setDirectoryLoading(false)
+  }
+}
   const set = (key, value) => setForm(f => ({ ...f, [key]: value }))
   const setObj = (obj, key, value) => setForm(f => ({ ...f, [obj]: { ...f[obj], [key]: value } }))
   const groups = form.groups || []
