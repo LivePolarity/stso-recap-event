@@ -886,7 +886,7 @@ function AdminForm({ initial, onSave, onCancel, busy }) {
                 onChange={v => setObj('bar', 'return_time', v)} />
             </div>
 
-            <Field label="Organisation au bar">
+            <Field label="Organisation repas">
               <select value={form.bar.meal_service || 'snack'}
                 onChange={e => setObj('bar', 'meal_service', e.target.value)}>
                 <option value="snack">Jetons repas : commande au bar, transmise au snack</option>
