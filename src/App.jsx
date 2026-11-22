@@ -205,7 +205,34 @@ async function loadGroupsDirectory() {
     </div><Textarea label="Informations générales / contexte" value={form.notes} onChange={v=>set('notes',v)} placeholder="Contexte, organisation générale, points de vigilance…" /></div>}
 
     {section === 'production' && <div className="form-section"><h3>Technique / production</h3>
-      <div className="section-intro">Ajoute les équipes qui interviennent. Pour le moment, les fiches peuvent être créées manuellement. La connexion Google Sheets sera raccordée ensuite.</div>
+      <div className="directory-import">
+  <p>Tu peux récupérer les équipes enregistrées dans le répertoire Google Sheets.</p>
+
+  <button
+    type="button"
+    className="btn secondary small"
+    onClick={loadGroupsDirectory}
+    disabled={directoryLoading}
+  >
+    <RefreshCw size={16} />
+    {directoryLoading ? 'Chargement...' : 'Charger le répertoire'}
+  </button>
+
+  {directoryError && (
+    <p className="error-message">{directoryError}</p>
+  )}
+
+  {directoryGroups.length > 0 && (
+    <div className="directory-results">
+      <p>{directoryGroups.length} équipe(s) récupérée(s) :</p>
+      {directoryGroups.map(group => (
+        <div key={group.id}>
+          {group.name || 'Équipe sans nom'}
+        </div>
+      ))}
+    </div>
+  )}
+</div>
       <div className="subsection-head"><h4>Fiches groupes / équipes</h4><button type="button" className="btn secondary small" onClick={()=>set('groups',[...groups,makeGroup()])}><Plus size={14}/> Ajouter une équipe</button></div>
       {!groups.length && <p className="empty-inline">Aucune équipe ajoutée pour le moment.</p>}
       {groups.map((g,i)=><article className="group-editor" key={g.id || i}><div className="subsection-head"><b>Équipe {i+1}</b><button type="button" className="icon-btn danger" title="Supprimer cette équipe" onClick={()=>set('groups',groups.filter(x=>x.id!==g.id))}><Trash2 size={16}/></button></div>
