@@ -60,3 +60,11 @@ Vite affiche l'adresse locale à ouvrir.
 - Le calendrier ouvre la première fiche lorsqu'il y a plusieurs événements le même jour.
 - La semaine est calculée du lundi au dimanche selon la date locale du navigateur.
 - Les données sont sauvegardées dans Supabase uniquement après connexion et configuration.
+
+## Mise à jour — paramètres et fiches groupes
+
+Pour activer la page **Administration > Paramètres**, exécuter une seule fois le fichier `supabase/migration_v2.sql` dans **Supabase > SQL Editor**.
+
+Cette migration ajoute des colonnes JSONB pour les futures fiches de production, les effectifs et les groupes, ainsi qu'une table `app_settings` réservée aux administrateurs. Elle ne supprime ni ne remplace les événements existants.
+
+La page Paramètres permet d'enregistrer le lien du Google Sheet. À ce stade, le lien est stocké dans Supabase, mais l'import automatique des lignes n'est pas encore activé : il faudra connecter le document réel et vérifier ses colonnes et ses droits de partage avant de mettre en place la synchronisation.

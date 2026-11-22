@@ -7,7 +7,7 @@ import {
 import { fr } from 'date-fns/locale'
 import {
   CalendarDays, ChevronLeft, ChevronRight, Clock3, Utensils, Wine,
-  LockKeyhole, LogOut, Plus, Pencil, Trash2, X, Save, RefreshCw
+  LockKeyhole, LogOut, Plus, Pencil, Trash2, X, Save, RefreshCw, Settings, ArrowLeft, ExternalLink
 } from 'lucide-react'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
@@ -173,8 +173,53 @@ function AdminForm({ initial, onSave, onCancel, busy }) {
   </form></div>
 }
 
+function AdminSettings({ onBack }) {
+  const [sheetUrl, setSheetUrl] = useState('')
+  const [busy, setBusy] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      const { data, error } = await supabase.from('app_settings').select('value').eq('key', 'google_sheet_url').maybeSingle()
+      if (!active) return
+      if (error) setError(`Impossible de charger les paramètres : ${error.message}`)
+      else setSheetUrl(data?.value?.url || '')
+      setBusy(false)
+    }
+    load()
+    return () => { active = false }
+  }, [])
+
+  const save = async e => {
+    e.preventDefault()
+    setSaving(true); setMessage(''); setError('')
+    const payload = { key: 'google_sheet_url', value: { url: sheetUrl.trim() }, updated_at: new Date().toISOString() }
+    const { error } = await supabase.from('app_settings').upsert(payload, { onConflict: 'key' })
+    setSaving(false)
+    if (error) setError(`Enregistrement impossible : ${error.message}`)
+    else setMessage('Lien enregistré. Il sera utilisé pour préparer la connexion aux fiches groupes.')
+  }
+
+  return <section className="settings-page">
+    <div className="settings-head"><button className="btn secondary small" onClick={onBack}><ArrowLeft size={14}/> Retour aux événements</button><div className="eyebrow">CONFIGURATION DU SITE</div><h1>Paramètres</h1><p>Les réglages communs à toutes les fiches événement.</p></div>
+    <form className="settings-card" onSubmit={save}>
+      <div className="settings-card-title"><span className="settings-icon"><ExternalLink size={18}/></span><div><h2>Fiches groupes · Google Sheets</h2><p>Document source des informations des groupes et de leurs équipes.</p></div></div>
+      {busy ? <p className="muted">Chargement des paramètres…</p> : <>
+        <Input label="Lien du Google Sheet" type="url" value={sheetUrl} onChange={setSheetUrl} placeholder="https://docs.google.com/spreadsheets/d/..." />
+        <p className="settings-help">Colle ici le lien du document qui contient une ligne par groupe. Tu pourras le remplacer à tout moment sans modifier les fiches événement.</p>
+        <div className="settings-note"><b>À savoir</b><br/>Enregistrer le lien ne donne pas automatiquement accès à son contenu. Pour que le site puisse lire les lignes, le document devra être partagé avec les droits adaptés ou exposé via une connexion Google Sheets gratuite. Cette étape sera configurée après validation du vrai tableau.</div>
+      </>}
+      {error && <div className="error-box">{error}</div>}{message && <div className="success-box">{message}</div>}
+      <div className="form-actions"><button className="btn primary" disabled={busy || saving}><Save size={15}/>{saving ? 'Enregistrement…' : 'Enregistrer les paramètres'}</button></div>
+    </form>
+  </section>
+}
+
 function AdminPage({ events, reload, user, signOut }) {
-  const [editing, setEditing] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState('')
+  const [editing, setEditing] = useState(null), [busy, setBusy] = useState(false), [error, setError] = useState(''), [showSettings, setShowSettings] = useState(false)
   const upcoming = events.filter(e => e.event_date >= format(new Date(), 'yyyy-MM-dd')).sort((a,b)=>a.event_date.localeCompare(b.event_date))
   const save = async data => {
     setBusy(true); setError('')
@@ -189,12 +234,12 @@ function AdminPage({ events, reload, user, signOut }) {
     const { error } = await supabase.from('events').delete().eq('id',e.id)
     if (error) setError(error.message); else reload()
   }
-  return <main className="admin-shell"><header className="admin-top"><div className="brand dark-brand"><span className="brand-mark">S</span><div><b>BISTROT SAINT SAUVEUR</b><small>ADMINISTRATION</small></div></div><div className="admin-user">{user.email}<button className="btn secondary small" onClick={signOut}><LogOut size={14}/> Déconnexion</button></div></header>
-    <div className="admin-content"><div className="admin-heading"><div><div className="eyebrow">GESTION DU PLANNING</div><h1>Événements à venir</h1><p>Crée, modifie ou supprime les fiches de tous les événements futurs.</p></div><button className="btn primary" onClick={()=>setEditing(structuredClone(emptyEvent))}><Plus size={17}/> Nouvel événement</button></div>
+  return <main className="admin-shell"><header className="admin-top"><div className="brand dark-brand"><span className="brand-mark">S</span><div><b>BISTROT SAINT SAUVEUR</b><small>ADMINISTRATION</small></div></div><div className="admin-user">{user.email}<button className="btn secondary small" onClick={()=>setShowSettings(v=>!v)}><Settings size={14}/> Paramètres</button><button className="btn secondary small" onClick={signOut}><LogOut size={14}/> Déconnexion</button></div></header>
+    {showSettings ? <div className="admin-content"><AdminSettings onBack={()=>setShowSettings(false)}/></div> : <div className="admin-content"><div className="admin-heading"><div><div className="eyebrow">GESTION DU PLANNING</div><h1>Événements à venir</h1><p>Crée, modifie ou supprime les fiches de tous les événements futurs.</p></div><button className="btn primary" onClick={()=>setEditing(structuredClone(emptyEvent))}><Plus size={17}/> Nouvel événement</button></div>
       {error && <div className="error-box">{error}</div>}
       <div className="admin-list">{upcoming.length ? upcoming.map(e=><article className="admin-event" key={e.id}><div className="admin-date"><b>{format(parseISO(e.event_date),'dd')}</b><span>{format(parseISO(e.event_date),'MMM yyyy',{locale:fr})}</span></div><div className="admin-event-main"><strong>{e.title}</strong><small>{fmtDate(e.event_date)} {e.start_time && `· ${e.start_time}`}</small><div className="admin-tags"><span><Utensils size={13}/> {e.catering?.people || 'Effectif non précisé'} pers.</span><span><Wine size={13}/> {e.bar?.meal_tokens || 0} jetons repas</span></div></div><div className="admin-actions"><button className="icon-btn" title="Modifier" onClick={()=>setEditing(structuredClone(e))}><Pencil /></button><button className="icon-btn danger" title="Supprimer" onClick={()=>remove(e)}><Trash2 /></button></div></article>) : <p className="empty">Aucun événement à venir. Tu peux créer le premier.</p>}</div>
       <p className="admin-footnote">{upcoming.length} événement{upcoming.length>1?'s':''} à venir · Les modifications sont publiées immédiatement.</p>
-    </div>{editing && <AdminForm initial={editing} onSave={save} onCancel={()=>setEditing(null)} busy={busy}/>}
+    </div>}{editing && <AdminForm initial={editing} onSave={save} onCancel={()=>setEditing(null)} busy={busy}/>}
   </main>
 }
 
