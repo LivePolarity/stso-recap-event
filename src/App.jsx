@@ -155,117 +155,793 @@ const dietKinds = ['Végétarien', 'Végan', 'Sans porc', 'Sans gluten', 'Sans l
 const makeGroup = () => ({ id: crypto.randomUUID(), name: '', contact: '', technical_contact: '', tech_sheet: '', timing: '', merch: '', vehicles: '', notes: '', headcounts: Object.fromEntries(teamKinds.map(k => [k, ''])) })
 const number = v => Math.max(0, Number.parseInt(v, 10) || 0)
 
+
 function AdminForm({ initial, onSave, onCancel, busy }) {
   const source = initial || structuredClone(emptyEvent)
-  const [form, setForm] = useState(() => ({ ...structuredClone(emptyEvent), ...source,
+
+  const [form, setForm] = useState(() => ({
+    ...structuredClone(emptyEvent),
+    ...source,
     production: { ...emptyEvent.production, ...(source.production || {}) },
     catering: { ...emptyEvent.catering, ...(source.catering || {}) },
     bar: { ...emptyEvent.bar, ...(source.bar || {}) },
     groups: Array.isArray(source.groups) ? source.groups : []
   }))
+
   const [section, setSection] = useState('general')
   const [directoryGroups, setDirectoryGroups] = useState([])
-const [directoryLoading, setDirectoryLoading] = useState(false)
-const [directoryError, setDirectoryError] = useState('')
+  const [directoryLoading, setDirectoryLoading] = useState(false)
+  const [directoryError, setDirectoryError] = useState('')
+  const [directorySearch, setDirectorySearch] = useState('')
+  const [directoryLoaded, setDirectoryLoaded] = useState(false)
 
-async function loadGroupsDirectory() {
-  setDirectoryLoading(true)
-  setDirectoryError('')
+  const set = (key, value) =>
+    setForm(f => ({ ...f, [key]: value }))
 
-  try {
-    const groups = await fetchGroupsDirectory()
-    setDirectoryGroups(groups)
-  } catch (error) {
-    setDirectoryError(error.message || 'Erreur lors du chargement.')
-  } finally {
-    setDirectoryLoading(false)
-  }
-}
-  const set = (key, value) => setForm(f => ({ ...f, [key]: value }))
-  const setObj = (obj, key, value) => setForm(f => ({ ...f, [obj]: { ...f[obj], [key]: value } }))
+  const setObj = (obj, key, value) =>
+    setForm(f => ({ ...f, [obj]: { ...f[obj], [key]: value } }))
+
   const groups = form.groups || []
-  const groupTotal = groups.reduce((sum, g) => sum + teamKinds.reduce((n, k) => n + number(g.headcounts?.[k]), 0), 0)
+
+  const groupTotal = groups.reduce(
+    (sum, g) =>
+      sum + teamKinds.reduce(
+        (n, k) => n + number(g.headcounts?.[k]),
+        0
+      ),
+    0
+  )
+
   const stsoTotal = number(form.production.stso_people)
   const eventTotal = groupTotal + stsoTotal
-  const updateGroup = (id, patch) => set('groups', groups.map(g => g.id === id ? { ...g, ...patch } : g))
-  const updateHeadcount = (id, kind, value) => set('groups', groups.map(g => g.id === id ? { ...g, headcounts: { ...g.headcounts, [kind]: value } } : g))
-  const updateTimeline = (id, patch) => setObj('production', 'timeline', (form.production.timeline || []).map(t => t.id === id ? { ...t, ...patch } : t))
-  const addTimeline = () => setObj('production', 'timeline', [...(form.production.timeline || []), { id: crypto.randomUUID(), type: timelineTypes[0], team: 'Tous', start: '', end: '', comment: '' }])
-  const tabs = [['general','Général'],['production','Technique / production'],['staffing','Effectifs'],['catering','Catering'],['bar','Bar / loges']]
-  const tab = key => <button type="button" className={`form-tab ${section === key ? 'active' : ''}`} onClick={() => setSection(key)}>{tabs.find(t=>t[0]===key)?.[1]}</button>
-  return <div className="modal-backdrop"><form className="modal admin-form expanded-form" onSubmit={e => { e.preventDefault(); onSave({ ...form, catering: { ...form.catering, people: form.catering.people === '' ? String(eventTotal) : form.catering.people }, bar: { ...form.bar, meal_tokens: form.bar.meal_tokens === '' ? String(eventTotal) : form.bar.meal_tokens } }) }}>
-    <div className="form-head"><div><div className="eyebrow">ADMINISTRATION · FICHE ÉVÉNEMENT</div><h2>{initial?.id ? 'Modifier l’événement' : 'Nouvel événement'}</h2></div><button type="button" className="icon-btn" onClick={onCancel}><X /></button></div>
-    <nav className="form-tabs">{tabs.map(([k]) => <React.Fragment key={k}>{tab(k)}</React.Fragment>)}</nav>
 
-    {section === 'general' && <div className="form-section"><h3>Informations générales</h3><div className="form-grid">
-      <Input label="Nom de l'événement *" value={form.title} onChange={v=>set('title',v)} required placeholder="Ex. Concert, privatisation…" />
-      <Input label="Date *" type="date" value={form.event_date} onChange={v=>set('event_date',v)} required />
-      <Input label="Heure de début" type="time" value={form.start_time} onChange={v=>set('start_time',v)} />
-      <Input label="Heure de fin" type="time" value={form.end_time} onChange={v=>set('end_time',v)} />
-    </div><Textarea label="Informations générales / contexte" value={form.notes} onChange={v=>set('notes',v)} placeholder="Contexte, organisation générale, points de vigilance…" /></div>}
+  const updateGroup = (id, patch) =>
+    set('groups', groups.map(g => g.id === id ? { ...g, ...patch } : g))
 
-    {section === 'production' && <div className="form-section"><h3>Technique / production</h3>
-      <div className="directory-import">
-  <p>Tu peux récupérer les équipes enregistrées dans le répertoire Google Sheets.</p>
+  const updateHeadcount = (id, kind, value) =>
+    set('groups', groups.map(g =>
+      g.id === id
+        ? { ...g, headcounts: { ...g.headcounts, [kind]: value } }
+        : g
+    ))
 
-  <button
-    type="button"
-    className="btn secondary small"
-    onClick={loadGroupsDirectory}
-    disabled={directoryLoading}
-  >
-    <RefreshCw size={16} />
-    {directoryLoading ? 'Chargement...' : 'Charger le répertoire'}
-  </button>
+  const updateTimeline = (id, patch) =>
+    setObj(
+      'production',
+      'timeline',
+      (form.production.timeline || []).map(t =>
+        t.id === id ? { ...t, ...patch } : t
+      )
+    )
 
-  {directoryError && (
-    <p className="error-message">{directoryError}</p>
-  )}
+  const addTimeline = () =>
+    setObj('production', 'timeline', [
+      ...(form.production.timeline || []),
+      {
+        id: crypto.randomUUID(),
+        type: timelineTypes[0],
+        team: 'Tous',
+        start: '',
+        end: '',
+        comment: ''
+      }
+    ])
 
-  {directoryGroups.length > 0 && (
-    <div className="directory-results">
-      <p>{directoryGroups.length} équipe(s) récupérée(s) :</p>
-      {directoryGroups.map(group => (
-        <div key={group.id}>
-          {group.name || 'Équipe sans nom'}
+  // Correspondance entre les colonnes Google Sheets et la fiche événement.
+  const mapDirectoryGroup = (group) => {
+    const data = group.data || {}
+
+    return {
+      name: group.name || data['NOM DU PROJET'] || '',
+      contact: data['CONTACT ORGA'] || '',
+      technical_contact: data['CONTACT TECHNIQUE'] || '',
+      tech_sheet: data['FICHE TECHNIQUE'] || '',
+      timing: data['TIMING'] || '',
+      merch: data['MERCH'] || '',
+      vehicles: data['VEHICULES'] || '',
+      notes: [
+        data['REGIMES ALIMENTAIRES SPECIFIQUES']
+          ? `Régimes alimentaires : ${data['REGIMES ALIMENTAIRES SPECIFIQUES']}`
+          : '',
+        data['DECOR / BACKDROP']
+          ? `Décor / backdrop : ${data['DECOR / BACKDROP']}`
+          : '',
+        data['AUTRE'] || ''
+      ].filter(Boolean).join('\n'),
+      headcounts: {
+        'Artistes': data['TEAM [Artistes, Danseur/Danseuses, Animateurs/Animatrices]'] ?? '',
+        'Technicien·ne·s son': data['TEAM [Technicien.ne.s son]'] ?? '',
+        'Technicien·ne·s lumière': data['TEAM [Technicien.ne.s lumière]'] ?? '',
+        'Technicien·ne·s vidéo/photo': data['TEAM [Technicien.ne.s vidéo/photo]'] ?? '',
+        'Autres technicien·ne·s': data['TEAM [Autres technicien.ne.s]'] ?? '',
+        'Merch': data['TEAM [Merch-guy / Merch-girl]'] ?? '',
+        'Autres': data['TEAM [Autre]'] ?? ''
+      }
+    }
+  }
+
+  // Représentation des champs importés pour comparer les modifications.
+  const getGroupSnapshot = (group) => ({
+    name: group.name || '',
+    contact: group.contact || '',
+    technical_contact: group.technical_contact || '',
+    tech_sheet: group.tech_sheet || '',
+    timing: group.timing || '',
+    merch: group.merch || '',
+    vehicles: group.vehicles || '',
+    notes: group.notes || '',
+    headcounts: Object.fromEntries(
+      teamKinds.map(k => [k, String(group.headcounts?.[k] ?? '')])
+    )
+  })
+
+  const isLocallyModified = (group) => {
+    if (!group.sourceId || !group.sourceSnapshot) return false
+
+    return JSON.stringify(getGroupSnapshot(group)) !==
+      JSON.stringify(group.sourceSnapshot)
+  }
+
+  const isSourceUpdated = (group) => {
+    if (!group.sourceId || !group.sourceSnapshot) return false
+
+    const currentSource = directoryGroups.find(
+      item => String(item.id) === String(group.sourceId)
+    )
+
+    if (!currentSource) return false
+
+    return JSON.stringify(mapDirectoryGroup(currentSource)) !==
+      JSON.stringify(group.sourceSnapshot)
+  }
+
+  async function loadGroupsDirectory() {
+    setDirectoryLoading(true)
+    setDirectoryError('')
+
+    try {
+      const loadedGroups = await fetchGroupsDirectory()
+      setDirectoryGroups(loadedGroups)
+      setDirectoryLoaded(true)
+    } catch (error) {
+      setDirectoryError(
+        error.message || 'Erreur lors du chargement du répertoire.'
+      )
+    } finally {
+      setDirectoryLoading(false)
+    }
+  }
+
+  function addDirectoryGroup(directoryGroup) {
+    const alreadyAdded = groups.some(
+      g => String(g.sourceId) === String(directoryGroup.id)
+    )
+
+    if (alreadyAdded) return
+
+    const mapped = mapDirectoryGroup(directoryGroup)
+
+    const newGroup = {
+      ...makeGroup(),
+      ...mapped,
+      id: crypto.randomUUID(),
+      sourceId: String(directoryGroup.id),
+      sourceSnapshot: structuredClone(mapped),
+      sourceData: directoryGroup.data || {}
+    }
+
+    set('groups', [...groups, newGroup])
+  }
+
+  function refreshGroupFromSource(group) {
+    const currentSource = directoryGroups.find(
+      item => String(item.id) === String(group.sourceId)
+    )
+
+    if (!currentSource) return
+
+    const mapped = mapDirectoryGroup(currentSource)
+
+    updateGroup(group.id, {
+      ...mapped,
+      sourceSnapshot: structuredClone(mapped),
+      sourceData: currentSource.data || {}
+    })
+  }
+
+  const filteredDirectoryGroups = directoryGroups.filter(group =>
+    (group.name || '').toLowerCase().includes(directorySearch.toLowerCase())
+  )
+
+  const tabs = [
+    ['general', 'Général'],
+    ['production', 'Technique / production'],
+    ['staffing', 'Effectifs'],
+    ['catering', 'Catering'],
+    ['bar', 'Bar / loges']
+  ]
+
+  const tab = key => (
+    <button
+      type="button"
+      className={`form-tab ${section === key ? 'active' : ''}`}
+      onClick={() => setSection(key)}
+    >
+      {tabs.find(t => t[0] === key)?.[1]}
+    </button>
+  )
+
+  return (
+    <div className="modal-backdrop">
+      <form
+        className="modal admin-form expanded-form"
+        onSubmit={e => {
+          e.preventDefault()
+          onSave({
+            ...form,
+            catering: {
+              ...form.catering,
+              people: form.catering.people === ''
+                ? String(eventTotal)
+                : form.catering.people
+            },
+            bar: {
+              ...form.bar,
+              meal_tokens: form.bar.meal_tokens === ''
+                ? String(eventTotal)
+                : form.bar.meal_tokens
+            }
+          })
+        }}
+      >
+        <div className="form-head">
+          <div>
+            <div className="eyebrow">ADMINISTRATION · FICHE ÉVÉNEMENT</div>
+            <h2>{initial?.id ? 'Modifier l’événement' : 'Nouvel événement'}</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onCancel}>
+            <X />
+          </button>
         </div>
-      ))}
+
+        <nav className="form-tabs">
+          {tabs.map(([k]) => (
+            <React.Fragment key={k}>{tab(k)}</React.Fragment>
+          ))}
+        </nav>
+
+        {section === 'general' && (
+          <div className="form-section">
+            <h3>Informations générales</h3>
+            <div className="form-grid">
+              <Input label="Nom de l'événement *" value={form.title}
+                onChange={v => set('title', v)}
+                required placeholder="Ex. Concert, privatisation…" />
+              <Input label="Date *" type="date" value={form.event_date}
+                onChange={v => set('event_date', v)} required />
+              <Input label="Heure de début" type="time" value={form.start_time}
+                onChange={v => set('start_time', v)} />
+              <Input label="Heure de fin" type="time" value={form.end_time}
+                onChange={v => set('end_time', v)} />
+            </div>
+            <Textarea label="Informations générales / contexte"
+              value={form.notes} onChange={v => set('notes', v)}
+              placeholder="Contexte, organisation générale, points de vigilance…" />
+          </div>
+        )}
+
+        {section === 'production' && (
+          <div className="form-section">
+            <h3>Technique / production</h3>
+
+            <div className="directory-import">
+              <div className="subsection-head">
+                <h4>Répertoire des groupes</h4>
+                <button
+                  type="button"
+                  className="btn secondary small"
+                  onClick={loadGroupsDirectory}
+                  disabled={directoryLoading}
+                >
+                  <RefreshCw size={14} />
+                  {directoryLoading ? 'Chargement…' : directoryLoaded ? 'Actualiser le répertoire' : 'Charger le répertoire'}
+                </button>
+              </div>
+
+              <p className="section-intro">
+                Recherche un groupe dans le répertoire Google Sheets pour
+                préremplir sa fiche. Les modifications faites ici restent
+                propres à cet événement.
+              </p>
+
+              {directoryError && (
+                <p className="error-message">{directoryError}</p>
+              )}
+
+              {directoryLoaded && (
+                <>
+                  <input
+                    type="search"
+                    className="directory-search"
+                    placeholder="Rechercher un groupe…"
+                    value={directorySearch}
+                    onChange={e => setDirectorySearch(e.target.value)}
+                  />
+
+                  <div className="directory-results">
+                    {filteredDirectoryGroups.length === 0 ? (
+                      <p className="empty-inline">
+                        Aucun groupe correspondant.
+                      </p>
+                    ) : (
+                      filteredDirectoryGroups.map(group => {
+                        const alreadyAdded = groups.some(
+                          g => String(g.sourceId) === String(group.id)
+                        )
+
+                        return (
+                          <button
+                            key={group.id}
+                            type="button"
+                            className="directory-result"
+                            disabled={alreadyAdded}
+                            onClick={() => addDirectoryGroup(group)}
+                          >
+                            <span>
+                              {group.name || 'Équipe sans nom'}
+                            </span>
+                            <span>
+                              {alreadyAdded ? '✓ Déjà ajouté' : '+ Ajouter'}
+                            </span>
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="subsection-head">
+              <h4>Fiches groupes / équipes</h4>
+              <button
+                type="button"
+                className="btn secondary small"
+                onClick={() => set('groups', [...groups, makeGroup()])}
+              >
+                <Plus size={14} /> Ajouter une équipe manuellement
+              </button>
+            </div>
+
+            {!groups.length && (
+              <p className="empty-inline">
+                Aucune équipe ajoutée pour le moment.
+              </p>
+            )}
+
+            {groups.map((g, i) => (
+              <article className="group-editor" key={g.id || i}>
+                <div className="subsection-head">
+                  <b>{g.name || `Équipe ${i + 1}`}</b>
+
+                  <div className="group-status">
+                    {g.sourceId ? (
+                      <>
+                        <span className="status-badge synced">
+                          Répertoire
+                        </span>
+                        {isLocallyModified(g) && (
+                          <span className="status-badge modified">
+                            Modifié localement
+                          </span>
+                        )}
+                        {isSourceUpdated(g) && (
+                          <span className="status-badge updated">
+                            Source actualisée
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="status-badge manual">
+                        Saisie manuelle
+                      </span>
+                    )}
+
+                    {g.sourceId && isSourceUpdated(g) && (
+                      <button
+                        type="button"
+                        className="btn secondary small"
+                        onClick={() => refreshGroupFromSource(g)}
+                      >
+                        Reprendre les données source
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      className="icon-btn danger"
+                      title="Supprimer cette équipe"
+                      onClick={() => set(
+                        'groups',
+                        groups.filter(x => x.id !== g.id)
+                      )}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="form-grid">
+                  <Input label="Nom du groupe / équipe" value={g.name}
+                    onChange={v => updateGroup(g.id, { name: v })}
+                    placeholder="Nom du groupe" />
+                  <Input label="Contact organisation" value={g.contact}
+                    onChange={v => updateGroup(g.id, { contact: v })} />
+                  <Input label="Contact technique" value={g.technical_contact}
+                    onChange={v => updateGroup(g.id, { technical_contact: v })} />
+                  <Input label="Lien fiche technique" value={g.tech_sheet}
+                    onChange={v => updateGroup(g.id, { tech_sheet: v })}
+                    placeholder="https://…" />
+                  <Input label="Timing / contraintes horaires" value={g.timing}
+                    onChange={v => updateGroup(g.id, { timing: v })} />
+                  <Input label="Merch" value={g.merch}
+                    onChange={v => updateGroup(g.id, { merch: v })} />
+                  <Input label="Véhicules" value={g.vehicles}
+                    onChange={v => updateGroup(g.id, { vehicles: v })} />
+                </div>
+
+                <h5>Effectif de cette équipe</h5>
+                <div className="form-grid compact-grid">
+                  {teamKinds.map(k => (
+                    <Input
+                      key={k}
+                      label={k}
+                      type="number"
+                      min="0"
+                      value={g.headcounts?.[k] ?? ''}
+                      onChange={v => updateHeadcount(g.id, k, v)}
+                    />
+                  ))}
+                </div>
+
+                <Textarea
+                  label="Notes / demandes particulières"
+                  value={g.notes}
+                  onChange={v => updateGroup(g.id, { notes: v })}
+                />
+
+                <div className="group-total">
+                  Total équipe : <b>
+                    {teamKinds.reduce(
+                      (n, k) => n + number(g.headcounts?.[k]),
+                      0
+                    )} personne(s)
+                  </b>
+                </div>
+              </article>
+            ))}
+
+            <div className="subsection-head timeline-title">
+              <h4>Déroulé / conduite</h4>
+              <button type="button" className="btn secondary small"
+                onClick={addTimeline}>
+                <Plus size={14} /> Ajouter une ligne
+              </button>
+            </div>
+
+            {(form.production.timeline || []).map((t, i) => (
+              <div className="timeline-row" key={t.id || i}>
+                <div className="timeline-index">{i + 1}</div>
+
+                <Field label="Description">
+                  <select value={t.type}
+                    onChange={e => updateTimeline(t.id, { type: e.target.value })}>
+                    {timelineTypes.map(x => <option key={x}>{x}</option>)}
+                  </select>
+                </Field>
+
+                <Field label="Équipe concernée">
+                  <select value={t.team}
+                    onChange={e => updateTimeline(t.id, { team: e.target.value })}>
+                    <option>Tous</option>
+                    <option>Tech StSo</option>
+                    {groups.map((g, j) => (
+                      <option key={g.id} value={g.name || `Équipe ${j + 1}`}>
+                        {g.name || `Équipe ${j + 1}`}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Début">
+                  <input type="time" value={t.start || ''}
+                    onChange={e => updateTimeline(t.id, { start: e.target.value })} />
+                </Field>
+
+                <Field label="Fin">
+                  <input type="time" value={t.end || ''}
+                    onChange={e => updateTimeline(t.id, { end: e.target.value })} />
+                </Field>
+
+                <Field label="Commentaires">
+                  <input value={t.comment || ''}
+                    onChange={e => updateTimeline(t.id, { comment: e.target.value })}
+                    placeholder="Précisions…" />
+                </Field>
+
+                <div className="timeline-actions">
+                  <button type="button" className="icon-btn" title="Monter"
+                    disabled={i === 0}
+                    onClick={() => {
+                      const a = [...(form.production.timeline || [])]
+                      ;[a[i - 1], a[i]] = [a[i], a[i - 1]]
+                      setObj('production', 'timeline', a)
+                    }}>↑</button>
+
+                  <button type="button" className="icon-btn" title="Descendre"
+                    disabled={i === (form.production.timeline || []).length - 1}
+                    onClick={() => {
+                      const a = [...(form.production.timeline || [])]
+                      ;[a[i + 1], a[i]] = [a[i], a[i + 1]]
+                      setObj('production', 'timeline', a)
+                    }}>↓</button>
+
+                  <button type="button" className="icon-btn danger"
+                    title="Supprimer la ligne"
+                    onClick={() => setObj(
+                      'production',
+                      'timeline',
+                      (form.production.timeline || []).filter(x => x.id !== t.id)
+                    )}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {section === 'staffing' && (
+          <div className="form-section">
+            <h3>Effectifs</h3>
+            <p className="section-intro">
+              Les effectifs des équipes sont additionnés automatiquement.
+              L'effectif StSo est renseigné séparément.
+            </p>
+
+            <div className="staffing-cards">
+              <div><span>Équipes / groupes</span><strong>{groupTotal}</strong></div>
+              <div><span>Équipe StSo</span><strong>{stsoTotal}</strong></div>
+              <div className="total"><span>Total événement</span><strong>{eventTotal}</strong></div>
+            </div>
+
+            <Input
+              label="Effectif StSo (salariés, régie, accueil, sécurité…)"
+              type="number"
+              min="0"
+              value={form.production.stso_people}
+              onChange={v => setObj('production', 'stso_people', v)}
+              placeholder="Nombre de personnes"
+            />
+
+            {groups.map((g, i) => (
+              <div className="staff-line" key={g.id || i}>
+                <span>{g.name || `Équipe ${i + 1}`}</span>
+                <b>
+                  {teamKinds.reduce(
+                    (n, k) => n + number(g.headcounts?.[k]),
+                    0
+                  )} pers.
+                </b>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {section === 'catering' && (
+          <div className="form-section">
+            <h3><Utensils /> Catering / repas</h3>
+            <p className="section-intro">
+              Le nombre de repas proposé reprend le total des effectifs.
+              Tu peux saisir un nombre différent si nécessaire.
+            </p>
+
+            <Input label="Nombre de repas à prévoir" type="number" min="0"
+              value={form.catering.people || String(eventTotal)}
+              onChange={v => setObj('catering', 'people', v)}
+              placeholder={String(eventTotal)} />
+
+            <Field label="Organisation des repas">
+              <div className="choice-list">
+                {[
+                  ['snack', 'Commande au snack le jour J'],
+                  ['bac', 'Bac gastro commun / chacun se sert et réchauffe'],
+                  ['portions', 'Portions individuelles à récupérer ou envoyer en loges']
+                ].map(([v, l]) => (
+                  <Check key={v}
+                    checked={(form.catering.formats || []).includes(v)}
+                    onChange={on => setObj(
+                      'catering',
+                      'formats',
+                      on
+                        ? [...(form.catering.formats || []), v]
+                        : (form.catering.formats || []).filter(x => x !== v)
+                    )}>
+                    {l}
+                  </Check>
+                ))}
+              </div>
+            </Field>
+
+            {(form.catering.formats || []).includes('snack') && (
+              <div className="form-grid">
+                <Input label="Début des commandes" type="time"
+                  value={form.catering.order_start}
+                  onChange={v => setObj('catering', 'order_start', v)} />
+                <Input label="Fin des commandes" type="time"
+                  value={form.catering.order_end}
+                  onChange={v => setObj('catering', 'order_end', v)} />
+              </div>
+            )}
+
+            {(form.catering.formats || []).some(x => x === 'bac' || x === 'portions') && (
+              <div className="form-grid">
+                <Input label="Heure de préparation cuisine" type="time"
+                  value={form.catering.prep_time}
+                  onChange={v => setObj('catering', 'prep_time', v)} />
+                <Input label="Heure de mise à disposition / envoi" type="time"
+                  value={form.catering.time}
+                  onChange={v => setObj('catering', 'time', v)} />
+              </div>
+            )}
+
+            {(form.catering.formats || []).includes('portions') && (
+              <Field label="Distribution des portions">
+                <select value={form.catering.distribution || 'pickup'}
+                  onChange={e => setObj('catering', 'distribution', e.target.value)}>
+                  <option value="pickup">Les artistes récupèrent au bar quand ils veulent</option>
+                  <option value="loges">Le bar envoie en loges, les artistes se servent</option>
+                </select>
+              </Field>
+            )}
+
+            <h4>Régimes alimentaires et allergies</h4>
+            <div className="diet-grid">
+              {dietKinds.map(k => (
+                <div className="diet-item" key={k}>
+                  <Check
+                    checked={!!form.catering.diet_counts?.[k]?.enabled}
+                    onChange={v => setObj(
+                      'catering',
+                      'diet_counts',
+                      {
+                        ...form.catering.diet_counts,
+                        [k]: {
+                          ...form.catering.diet_counts?.[k],
+                          enabled: v
+                        }
+                      }
+                    )}>
+                    {k}
+                  </Check>
+
+                  {form.catering.diet_counts?.[k]?.enabled && (
+                    <input aria-label={`Nombre ${k}`} type="number" min="0"
+                      placeholder="Nb"
+                      value={form.catering.diet_counts?.[k]?.count || ''}
+                      onChange={e => setObj(
+                        'catering',
+                        'diet_counts',
+                        {
+                          ...form.catering.diet_counts,
+                          [k]: {
+                            ...form.catering.diet_counts?.[k],
+                            count: e.target.value
+                          }
+                        }
+                      )} />
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {form.catering.diet_counts?.Autre?.enabled && (
+              <Input label="Préciser autre régime / allergie"
+                value={form.catering.other_diet || ''}
+                onChange={v => setObj('catering', 'other_diet', v)} />
+            )}
+
+            <Textarea label="Détails allergies / intolérances"
+              value={form.catering.allergies}
+              onChange={v => setObj('catering', 'allergies', v)} />
+            <Textarea label="Commentaires catering"
+              value={form.catering.comments}
+              onChange={v => setObj('catering', 'comments', v)} />
+          </div>
+        )}
+
+        {section === 'bar' && (
+          <div className="form-section">
+            <h3><Wine /> Bar / loges</h3>
+
+            <div className="form-grid">
+              <Input label="Jetons repas" type="number" min="0"
+                value={form.bar.meal_tokens || String(eventTotal)}
+                onChange={v => setObj('bar', 'meal_tokens', v)}
+                placeholder={String(eventTotal)} />
+              <Input label="Jetons boissons" type="number" min="0"
+                value={form.bar.drink_tokens}
+                onChange={v => setObj('bar', 'drink_tokens', v)} />
+              <Input label="Ouverture / installation loges" type="time"
+                value={form.bar.loges_open}
+                onChange={v => setObj('bar', 'loges_open', v)} />
+              <Input label="Fermeture / libération loges" type="time"
+                value={form.bar.loges_close}
+                onChange={v => setObj('bar', 'loges_close', v)} />
+              <Input label="Heure d'envoi des repas en loges" type="time"
+                value={form.bar.meal_time}
+                onChange={v => setObj('bar', 'meal_time', v)} />
+              <Input label="Heure de retour des bacs / contenants" type="time"
+                value={form.bar.return_time}
+                onChange={v => setObj('bar', 'return_time', v)} />
+            </div>
+
+            <Field label="Organisation au bar">
+              <select value={form.bar.meal_service || 'snack'}
+                onChange={e => setObj('bar', 'meal_service', e.target.value)}>
+                <option value="snack">Jetons repas : commande au bar, transmise au snack</option>
+                <option value="bac">Bacs gastro : le bar amène les bacs en loges</option>
+                <option value="portions_pickup">Portions : les artistes récupèrent au bar</option>
+                <option value="portions_loges">Portions : le bar envoie en loges</option>
+              </select>
+            </Field>
+
+            <Input label="Boissons prévues" value={form.bar.drinks}
+              onChange={v => setObj('bar', 'drinks', v)}
+              placeholder="Eau, softs…" />
+            <Textarea label="Demandes spécifiques / loges"
+              value={form.bar.requests}
+              onChange={v => setObj('bar', 'requests', v)} />
+            <Textarea label="Commentaires bar"
+              value={form.bar.comments}
+              onChange={v => setObj('bar', 'comments', v)} />
+          </div>
+        )}
+
+        <div className="form-actions">
+          <button type="button" className="btn secondary" onClick={onCancel}>
+            Annuler
+          </button>
+
+          {section !== 'general' && (
+            <button type="button" className="btn secondary"
+              onClick={() => setSection(
+                tabs[Math.max(0, tabs.findIndex(t => t[0] === section) - 1)][0]
+              )}>
+              Précédent
+            </button>
+          )}
+
+          {section !== 'bar' && (
+            <button type="button" className="btn secondary"
+              onClick={() => setSection(
+                tabs[Math.min(tabs.length - 1, tabs.findIndex(t => t[0] === section) + 1)][0]
+              )}>
+              Suivant
+            </button>
+          )}
+
+          <button className="btn primary"
+            disabled={busy || !form.title.trim() || !form.event_date}>
+            <Save size={16} />
+            {busy ? 'Enregistrement…' : 'Enregistrer l’événement'}
+          </button>
+        </div>
+      </form>
     </div>
-  )}
-</div>
-      <div className="subsection-head"><h4>Fiches groupes / équipes</h4><button type="button" className="btn secondary small" onClick={()=>set('groups',[...groups,makeGroup()])}><Plus size={14}/> Ajouter une équipe</button></div>
-      {!groups.length && <p className="empty-inline">Aucune équipe ajoutée pour le moment.</p>}
-      {groups.map((g,i)=><article className="group-editor" key={g.id || i}><div className="subsection-head"><b>Équipe {i+1}</b><button type="button" className="icon-btn danger" title="Supprimer cette équipe" onClick={()=>set('groups',groups.filter(x=>x.id!==g.id))}><Trash2 size={16}/></button></div>
-        <div className="form-grid"><Input label="Nom du groupe / équipe" value={g.name} onChange={v=>updateGroup(g.id,{name:v})} placeholder="Nom du groupe"/><Input label="Contact organisation" value={g.contact} onChange={v=>updateGroup(g.id,{contact:v})}/><Input label="Contact technique" value={g.technical_contact} onChange={v=>updateGroup(g.id,{technical_contact:v})}/><Input label="Lien fiche technique" value={g.tech_sheet} onChange={v=>updateGroup(g.id,{tech_sheet:v})} placeholder="https://…"/><Input label="Timing / contraintes horaires" value={g.timing} onChange={v=>updateGroup(g.id,{timing:v})}/><Input label="Merch" value={g.merch} onChange={v=>updateGroup(g.id,{merch:v})}/><Input label="Véhicules" value={g.vehicles} onChange={v=>updateGroup(g.id,{vehicles:v})}/></div>
-        <h5>Effectif de cette équipe</h5><div className="form-grid compact-grid">{teamKinds.map(k=><Input key={k} label={k} type="number" min="0" value={g.headcounts?.[k] ?? ''} onChange={v=>updateHeadcount(g.id,k,v)} />)}</div>
-        <Textarea label="Notes / demandes particulières" value={g.notes} onChange={v=>updateGroup(g.id,{notes:v})}/>
-        <div className="group-total">Total équipe : <b>{teamKinds.reduce((n,k)=>n+number(g.headcounts?.[k]),0)} personne(s)</b></div>
-      </article>)}
-      <div className="subsection-head timeline-title"><h4>Déroulé / conduite</h4><button type="button" className="btn secondary small" onClick={addTimeline}><Plus size={14}/> Ajouter une ligne</button></div>
-      {(form.production.timeline || []).map((t,i)=><div className="timeline-row" key={t.id || i}><div className="timeline-index">{i+1}</div><Field label="Description"><select value={t.type} onChange={e=>updateTimeline(t.id,{type:e.target.value})}>{timelineTypes.map(x=><option key={x}>{x}</option>)}</select></Field><Field label="Équipe concernée"><select value={t.team} onChange={e=>updateTimeline(t.id,{team:e.target.value})}><option>Tous</option><option>Tech StSo</option>{groups.map((g,j)=><option key={g.id} value={g.name || `Équipe ${j+1}`}>{g.name || `Équipe ${j+1}`}</option>)}</select></Field><Field label="Début"><input type="time" value={t.start || ''} onChange={e=>updateTimeline(t.id,{start:e.target.value})}/></Field><Field label="Fin"><input type="time" value={t.end || ''} onChange={e=>updateTimeline(t.id,{end:e.target.value})}/></Field><Field label="Commentaires"><input value={t.comment || ''} onChange={e=>updateTimeline(t.id,{comment:e.target.value})} placeholder="Précisions…"/></Field><div className="timeline-actions"><button type="button" className="icon-btn" title="Monter" disabled={i===0} onClick={()=>{const a=[...(form.production.timeline||[])];[a[i-1],a[i]]=[a[i],a[i-1]];setObj('production','timeline',a)}}>↑</button><button type="button" className="icon-btn" title="Descendre" disabled={i===(form.production.timeline||[]).length-1} onClick={()=>{const a=[...(form.production.timeline||[])];[a[i+1],a[i]]=[a[i],a[i+1]];setObj('production','timeline',a)}}>↓</button><button type="button" className="icon-btn danger" title="Supprimer la ligne" onClick={()=>setObj('production','timeline',(form.production.timeline||[]).filter(x=>x.id!==t.id))}><Trash2 size={15}/></button></div></div>)}
-    </div>}
-
-    {section === 'staffing' && <div className="form-section"><h3>Effectifs</h3><p className="section-intro">Les effectifs des équipes sont additionnés automatiquement. L'effectif StSo est renseigné séparément.</p><div className="staffing-cards"><div><span>Équipes / groupes</span><strong>{groupTotal}</strong></div><div><span>Équipe StSo</span><strong>{stsoTotal}</strong></div><div className="total"><span>Total événement</span><strong>{eventTotal}</strong></div></div><Input label="Effectif StSo (salariés, régie, accueil, sécurité…)" type="number" min="0" value={form.production.stso_people} onChange={v=>setObj('production','stso_people',v)} placeholder="Nombre de personnes"/>
-      {groups.map((g,i)=><div className="staff-line" key={g.id || i}><span>{g.name || `Équipe ${i+1}`}</span><b>{teamKinds.reduce((n,k)=>n+number(g.headcounts?.[k]),0)} pers.</b></div>)}
-    </div>}
-
-    {section === 'catering' && <div className="form-section"><h3><Utensils/> Catering / repas</h3><p className="section-intro">Le nombre de repas proposé reprend le total des effectifs. Tu peux saisir un nombre différent si nécessaire.</p><Input label="Nombre de repas à prévoir" type="number" min="0" value={form.catering.people || String(eventTotal)} onChange={v=>setObj('catering','people',v)} placeholder={String(eventTotal)}/>
-      <Field label="Organisation des repas"><div className="choice-list">{[['snack','Commande au snack le jour J'],['bac','Bac gastro commun / chacun se sert et réchauffe'],['portions','Portions individuelles à récupérer ou envoyer en loges']].map(([v,l])=><Check key={v} checked={(form.catering.formats||[]).includes(v)} onChange={on => setObj('catering','formats',on?[...(form.catering.formats||[]),v]:(form.catering.formats||[]).filter(x=>x!==v))}>{l}</Check>)}</div></Field>
-      {(form.catering.formats||[]).includes('snack') && <div className="form-grid"><Input label="Début des commandes" type="time" value={form.catering.order_start} onChange={v=>setObj('catering','order_start',v)}/><Input label="Fin des commandes" type="time" value={form.catering.order_end} onChange={v=>setObj('catering','order_end',v)}/></div>}
-      {(form.catering.formats||[]).some(x=>x==='bac'||x==='portions') && <div className="form-grid"><Input label="Heure de préparation cuisine" type="time" value={form.catering.prep_time} onChange={v=>setObj('catering','prep_time',v)}/><Input label="Heure de mise à disposition / envoi" type="time" value={form.catering.time} onChange={v=>setObj('catering','time',v)}/></div>}
-      {(form.catering.formats||[]).includes('portions') && <Field label="Distribution des portions"><select value={form.catering.distribution||'pickup'} onChange={e=>setObj('catering','distribution',e.target.value)}><option value="pickup">Les artistes récupèrent au bar quand ils veulent</option><option value="loges">Le bar envoie en loges, les artistes se servent</option></select></Field>}
-      <h4>Régimes alimentaires et allergies</h4><div className="diet-grid">{dietKinds.map(k=><div className="diet-item" key={k}><Check checked={!!form.catering.diet_counts?.[k]?.enabled} onChange={v=>setObj('catering','diet_counts',{...form.catering.diet_counts,[k]:{...form.catering.diet_counts?.[k],enabled:v}})}>{k}</Check>{form.catering.diet_counts?.[k]?.enabled && <input aria-label={`Nombre ${k}`} type="number" min="0" placeholder="Nb" value={form.catering.diet_counts?.[k]?.count||''} onChange={e=>setObj('catering','diet_counts',{...form.catering.diet_counts,[k]:{...form.catering.diet_counts?.[k],count:e.target.value}})}/>}</div>)}</div>
-      {form.catering.diet_counts?.Autre?.enabled && <Input label="Préciser autre régime / allergie" value={form.catering.other_diet||''} onChange={v=>setObj('catering','other_diet',v)}/>}
-      <Textarea label="Détails allergies / intolérances" value={form.catering.allergies} onChange={v=>setObj('catering','allergies',v)}/><Textarea label="Commentaires catering" value={form.catering.comments} onChange={v=>setObj('catering','comments',v)}/>
-    </div>}
-
-    {section === 'bar' && <div className="form-section"><h3><Wine/> Bar / loges</h3><div className="form-grid"><Input label="Jetons repas" type="number" min="0" value={form.bar.meal_tokens || String(eventTotal)} onChange={v=>setObj('bar','meal_tokens',v)} placeholder={String(eventTotal)}/><Input label="Jetons boissons" type="number" min="0" value={form.bar.drink_tokens} onChange={v=>setObj('bar','drink_tokens',v)}/><Input label="Ouverture / installation loges" type="time" value={form.bar.loges_open} onChange={v=>setObj('bar','loges_open',v)}/><Input label="Fermeture / libération loges" type="time" value={form.bar.loges_close} onChange={v=>setObj('bar','loges_close',v)}/><Input label="Heure d'envoi des repas en loges" type="time" value={form.bar.meal_time} onChange={v=>setObj('bar','meal_time',v)}/><Input label="Heure de retour des bacs / contenants" type="time" value={form.bar.return_time} onChange={v=>setObj('bar','return_time',v)}/></div>
-      <Field label="Organisation au bar"><select value={form.bar.meal_service||'snack'} onChange={e=>setObj('bar','meal_service',e.target.value)}><option value="snack">Jetons repas : commande au bar, transmise au snack</option><option value="bac">Bacs gastro : le bar amène les bacs en loges</option><option value="portions_pickup">Portions : les artistes récupèrent au bar</option><option value="portions_loges">Portions : le bar envoie en loges</option></select></Field>
-      <Input label="Boissons prévues" value={form.bar.drinks} onChange={v=>setObj('bar','drinks',v)} placeholder="Eau, softs…"/><Textarea label="Demandes spécifiques / loges" value={form.bar.requests} onChange={v=>setObj('bar','requests',v)}/><Textarea label="Commentaires bar" value={form.bar.comments} onChange={v=>setObj('bar','comments',v)}/>
-    </div>}
-    <div className="form-actions"><button type="button" className="btn secondary" onClick={onCancel}>Annuler</button>{section !== 'general' && <button type="button" className="btn secondary" onClick={()=>setSection(tabs[Math.max(0,tabs.findIndex(t=>t[0]===section)-1)][0])}>Précédent</button>}{section !== 'bar' && <button type="button" className="btn secondary" onClick={()=>setSection(tabs[Math.min(tabs.length-1,tabs.findIndex(t=>t[0]===section)+1)][0])}>Suivant</button>}<button className="btn primary" disabled={busy || !form.title.trim() || !form.event_date}><Save size={16}/>{busy ? 'Enregistrement…' : 'Enregistrer l’événement'}</button></div>
-  </form></div>
+  )
 }
+
 
 function AdminSettings({ onBack }) {
   const [sheetUrl, setSheetUrl] = useState('')
