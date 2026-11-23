@@ -247,18 +247,157 @@ function AdminSettings({onBack}) {
   return <section className="settings-page"><div className="settings-head"><button className="btn secondary small" onClick={onBack}><ArrowLeft size={14}/> Retour aux événements</button><div className="eyebrow">CONFIGURATION DU SITE</div><h1>Paramètres</h1><p>Les réglages communs à toutes les fiches événement.</p></div><form className="settings-card" onSubmit={save}><div className="settings-card-title"><span className="settings-icon"><ExternalLink size={18}/></span><div><h2>Fiches groupes · Google Sheets</h2><p>Document source des informations des groupes et de leurs équipes.</p></div></div>{busy?<p className="muted">Chargement…</p>:<><Input label="Lien du Google Sheet" type="url" value={sheetUrl} onChange={setSheetUrl} placeholder="https://docs.google.com/spreadsheets/d/..."/><p className="settings-help">Le lien est conservé dans les paramètres. La lecture des données utilise la fonction Google Sheets déjà installée.</p></>}{error&&<div className="error-box">{error}</div>}{message&&<div className="success-box">{message}</div>}<div className="form-actions"><button className="btn primary" disabled={busy||saving}><Save size={15}/>{saving?'Enregistrement…':'Enregistrer les paramètres'}</button></div></form></section>
 }
 
+
 function AdminPage({events,reload,user,signOut}) {
   const [editing,setEditing]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[view,setView]=useState('events'),[contacts,setContacts]=useState([])
+
   const allEvents=[...events].sort((a,b)=>b.event_date.localeCompare(a.event_date))
-  const reloadContacts=async()=>{const {data,error}=await supabase.from('contacts').select('*').order('name');if(error)setError(`Chargement des contacts impossible : ${error.message}`);else setContacts(data||[])}
+
+  const reloadContacts=async()=>{
+    const {data,error}=await supabase.from('contacts').select('*').order('name')
+    if(error)setError(`Chargement des contacts impossible : ${error.message}`)
+    else setContacts(data||[])
+  }
+
   useEffect(()=>{reloadContacts()},[])
-  const save=async data=>{setBusy(true);setError('');const payload={title:data.title.trim(),event_date:data.event_date,start_time:data.start_time||null,end_time:data.end_time||null,notes:data.notes||'',catering:data.catering,bar:data.bar,production:data.production||{},staffing:data.staffing||{},groups:data.groups||[],contacts:data.contacts||{}};const result=data.id?await supabase.from('events').update(payload).eq('id',data.id):await supabase.from('events').insert(payload);setBusy(false);if(result.error){setError(result.error.message);return}setEditing(null);reload()}
-  const remove=async e=>{if(!confirm(`Supprimer « ${e.title} » ? Cette action est définitive.`))return;const {error}=await supabase.from('events').delete().eq('id',e.id);if(error)setError(error.message);else reload()}
-  return <main className="admin-shell"><header className="admin-top"><div className="brand dark-brand"><span className="brand-mark">S</span><div><b>BISTROT SAINT SAUVEUR</b><small>ADMINISTRATION</small></div></div><div className="admin-user"><span>{user.email}</span><button className="btn secondary small" onClick={()=>setView(view==='settings'?'events':'settings')}><Settings size={14}/> Paramètres</button><button className="btn secondary small" onClick={()=>setView(view==='contacts'?'events':'contacts')}><Contact size={14}/> Contacts</button><button className="btn secondary small" onClick={signOut}><LogOut size={14}/> Déconnexion</button></div></header>
-    <div className="admin-content">{view==='settings'?<AdminSettings onBack={()=>setView('events')}/>:view==='contacts'?<ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>:<><div className="admin-heading"><div><div className="eyebrow">GESTION DU PLANNING</div><h1>Événements à venir</h1><p>Crée, modifie ou supprime les fiches de tous les événements futurs.</p></div><button className="btn primary" onClick={()=>setEditing(structuredClone(emptyEvent))}><Plus size={17}/> Nouvel événement</button></div>{error&&<div className="error-box">{error}</div>}<div className="admin-list">{upcoming.length?upcoming.map(e=><article className="admin-event" key={e.id}><div className="admin-date"><b>{format(parseISO(e.event_date),'dd')}</b><span>{format(parseISO(e.event_date),'MMM yyyy',{locale:fr})}</span></div><div className="admin-event-main"><strong>{e.title}</strong><small>{fmtDate(e.event_date)} · {e.start_time||'Horaire à préciser'}{e.end_time?` – ${e.end_time}`:''}</small><div className="admin-tags"><span><Utensils size={13}/> {e.catering?.people||'Repas non précisés'} repas</span><span><Wine size={13}/> {e.bar?.meal_tokens||0} jetons repas</span></div></div><div className="admin-actions"><button className="icon-btn" title="Modifier" onClick={()=>setEditing(structuredClone(e))}><Pencil/></button><button className="icon-btn danger" title="Supprimer" onClick={()=>remove(e)}><Trash2/></button></div></article>):<p className="empty">Aucun événement à venir. Tu peux créer le premier.</p>}</div><p className="admin-footnote">{upcoming.length} événement{upcoming.length>1?'s':''} à venir · Les modifications sont publiées immédiatement.</p></>}</div>
-    {editing&&<AdminForm initial={editing} onSave={save} onCancel={()=>setEditing(null)} busy={busy} contacts={contacts}/>}
-  </main>
+
+  const save=async data=>{
+    setBusy(true)
+    setError('')
+    const payload={
+      title:data.title.trim(),
+      event_date:data.event_date,
+      start_time:data.start_time||null,
+      end_time:data.end_time||null,
+      notes:data.notes||'',
+      catering:data.catering,
+      bar:data.bar,
+      production:data.production||{},
+      staffing:data.staffing||{},
+      groups:data.groups||[],
+      contacts:data.contacts||{}
+    }
+    const result=data.id
+      ? await supabase.from('events').update(payload).eq('id',data.id)
+      : await supabase.from('events').insert(payload)
+
+    setBusy(false)
+
+    if(result.error){
+      setError(result.error.message)
+      return
+    }
+
+    setEditing(null)
+    reload()
+  }
+
+  const remove=async e=>{
+    if(!confirm(`Supprimer « ${e.title} » ? Cette action est définitive.`))return
+    const {error}=await supabase.from('events').delete().eq('id',e.id)
+    if(error)setError(error.message)
+    else reload()
+  }
+
+  return (
+    <main className="admin-shell">
+      <header className="admin-top">
+        <div className="brand dark-brand">
+          <span className="brand-mark">S</span>
+          <div>
+            <b>BISTROT SAINT SAUVEUR</b>
+            <small>ADMINISTRATION</small>
+          </div>
+        </div>
+
+        <div className="admin-user">
+          <span>{user.email}</span>
+          <button className="btn secondary small" onClick={()=>setView(view==='settings'?'events':'settings')}>
+            <Settings size={14}/> Paramètres
+          </button>
+          <button className="btn secondary small" onClick={()=>setView(view==='contacts'?'events':'contacts')}>
+            <Contact size={14}/> Contacts
+          </button>
+          <button className="btn secondary small" onClick={signOut}>
+            <LogOut size={14}/> Déconnexion
+          </button>
+        </div>
+      </header>
+
+      <div className="admin-content">
+        {view==='settings'
+          ? <AdminSettings onBack={()=>setView('events')}/>
+          : view==='contacts'
+            ? <ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>
+            : <>
+                <div className="admin-heading">
+                  <div>
+                    <div className="eyebrow">GESTION DU PLANNING</div>
+                    <h1>Tous les événements</h1>
+                    <p>Consulte, crée, modifie ou supprime les fiches, passées comme futures.</p>
+                  </div>
+                  <button className="btn primary" onClick={()=>setEditing(structuredClone(emptyEvent))}>
+                    <Plus size={17}/> Nouvel événement
+                  </button>
+                </div>
+
+                {error&&<div className="error-box">{error}</div>}
+
+                <div className="admin-list">
+                  {allEvents.length
+                    ? allEvents.map(e=>(
+                        <article className="admin-event" key={e.id}>
+                          <div className="admin-date">
+                            <b>{format(parseISO(e.event_date),'dd')}</b>
+                            <span>{format(parseISO(e.event_date),'MMM yyyy',{locale:fr})}</span>
+                          </div>
+
+                          <div className="admin-event-main">
+                            <strong>{e.title}</strong>
+                            <small>
+                              {fmtDate(e.event_date)} · {e.start_time||'Horaire à préciser'}
+                              {e.end_time?` – ${e.end_time}`:''}
+                            </small>
+                            <div className="admin-tags">
+                              <span><Utensils size={13}/> {e.catering?.people||'Repas non précisés'} repas</span>
+                              <span><Wine size={13}/> {e.bar?.meal_tokens||0} jetons repas</span>
+                            </div>
+                          </div>
+
+                          <div className="admin-actions">
+                            <button className="icon-btn" title="Modifier" onClick={()=>setEditing(structuredClone(e))}>
+                              <Pencil/>
+                            </button>
+                            <button className="icon-btn danger" title="Supprimer" onClick={()=>remove(e)}>
+                              <Trash2/>
+                            </button>
+                          </div>
+                        </article>
+                      ))
+                    : <p className="empty">Aucun événement enregistré.</p>
+                  }
+                </div>
+
+                <p className="admin-footnote">
+                  {allEvents.length} événement{allEvents.length>1?'s':''} au total · Les modifications sont publiées immédiatement.
+                </p>
+              </>
+        }
+      </div>
+
+      {editing&&
+        <AdminForm
+          initial={editing}
+          onSave={save}
+          onCancel={()=>setEditing(null)}
+          busy={busy}
+          contacts={contacts}
+        />
+      }
+    </main>
+  )
 }
+
 function Login({onLogin}) {
   const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('')
   const submit=async e=>{e.preventDefault();setBusy(true);setError('');const {error}=await supabase.auth.signInWithPassword({email,password});setBusy(false);if(error)setError('Connexion impossible. Vérifie tes identifiants et les droits administrateur.');else onLogin()}
