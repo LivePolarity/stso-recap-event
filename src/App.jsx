@@ -249,7 +249,7 @@ function AdminSettings({onBack}) {
 
 function AdminPage({events,reload,user,signOut}) {
   const [editing,setEditing]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[view,setView]=useState('events'),[contacts,setContacts]=useState([])
-  const upcoming=events.filter(e=>e.event_date>=format(new Date(),'yyyy-MM-dd')).sort((a,b)=>a.event_date.localeCompare(b.event_date))
+  const allEvents=[...events].sort((a,b)=>b.event_date.localeCompare(a.event_date))
   const reloadContacts=async()=>{const {data,error}=await supabase.from('contacts').select('*').order('name');if(error)setError(`Chargement des contacts impossible : ${error.message}`);else setContacts(data||[])}
   useEffect(()=>{reloadContacts()},[])
   const save=async data=>{setBusy(true);setError('');const payload={title:data.title.trim(),event_date:data.event_date,start_time:data.start_time||null,end_time:data.end_time||null,notes:data.notes||'',catering:data.catering,bar:data.bar,production:data.production||{},staffing:data.staffing||{},groups:data.groups||[],contacts:data.contacts||{}};const result=data.id?await supabase.from('events').update(payload).eq('id',data.id):await supabase.from('events').insert(payload);setBusy(false);if(result.error){setError(result.error.message);return}setEditing(null);reload()}
