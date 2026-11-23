@@ -101,3 +101,148 @@
   color: #b42318;
   font-size: 13px;
 }
+
+/* ==================================
+   IDENTITÉ VISUELLE BISTROT STSO
+   Violet : #650065
+   Jaune  : #EFBF04
+================================== */
+
+:root {
+  --stso-purple: #650065;
+  --stso-purple-dark: #480048;
+  --stso-purple-light: #f4eaf4;
+  --stso-yellow: #EFBF04;
+  --stso-yellow-light: #fff8d9;
+}
+
+/* Identité et en-têtes */
+.hero {
+  background: var(--stso-purple);
+}
+
+.brand-mark {
+  background: var(--stso-yellow);
+  color: var(--stso-purple);
+}
+
+.dark-brand .brand-mark {
+  background: var(--stso-purple);
+  color: var(--stso-yellow);
+}
+
+/* Boutons */
+.btn.primary,
+.admin-link {
+  background: var(--stso-purple);
+  color: white;
+}
+
+.btn.primary:hover {
+  background: var(--stso-purple-dark);
+}
+
+.form-tab.active {
+  background: var(--stso-purple);
+  border-color: var(--stso-purple);
+  color: white;
+}
+
+.refresh-btn:hover {
+  background: #ffffff30;
+}
+
+/* Accents et calendrier */
+.calendar-day.today {
+  outline-color: var(--stso-yellow);
+  background: var(--stso-yellow-light);
+}
+
+.calendar-day.has-events {
+  background: var(--stso-purple-light);
+}
+
+.calendar-day i {
+  background: var(--stso-purple);
+}
+
+.calendar-day small {
+  color: var(--stso-purple);
+}
+
+.count-pill {
+  background: var(--stso-purple-light);
+  color: var(--stso-purple);
+}
+
+/* Icônes et éléments actifs */
+.detail-card h3 svg,
+.form-section h3 svg,
+.settings-icon {
+  color: var(--stso-purple);
+}
+
+.settings-icon {
+  background: var(--stso-purple-light);
+}
+
+.setup-icon {
+  background: var(--stso-purple-light);
+  color: var(--stso-purple);
+}
+
+/* Champs sélectionnés */
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--stso-purple);
+  box-shadow: 0 0 0 3px #65006518;
+}
+
+.choice-list input,
+.check input {
+  accent-color: var(--stso-purple);
+}
+
+/* Pastilles d'état */
+.status-badge.synced {
+  background: #e5f2e9;
+  color: #28613b;
+}
+
+.status-badge.modified {
+  background: var(--stso-yellow-light);
+  color: #765d00;
+}
+
+.status-badge.updated {
+  background: var(--stso-purple-light);
+  color: var(--stso-purple);
+}
+
+/* Boutons secondaires et navigation */
+.icon-btn:hover,
+.directory-result:hover:not(:disabled) {
+  background: var(--stso-purple-light);
+  color: var(--stso-purple);
+}
+
+.admin-date {
+  background: var(--stso-purple-light);
+}
+
+.staffing-cards .total {
+  background: var(--stso-purple-light);
+}
+
+.staffing-cards .total strong {
+  color: var(--stso-purple);
+}
+
+.settings-note {
+  border-left-color: var(--stso-yellow);
+}
+
+.form-tab.active {
+  box-shadow: 0 2px 8px #65006520;
+}
