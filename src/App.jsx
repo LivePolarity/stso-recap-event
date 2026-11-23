@@ -248,154 +248,31 @@ function AdminSettings({onBack}) {
 }
 
 
-function AdminPage({events,reload,user,signOut}) {
-  const [editing,setEditing]=useState(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[view,setView]=useState('events'),[contacts,setContacts]=useState([])
+.admin-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 30px 0 14px;
+  font-size: 19px;
+  color: #650065;
+}
 
-  const allEvents=[...events].sort((a,b)=>b.event_date.localeCompare(a.event_date))
+.admin-section-title span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 25px;
+  height: 25px;
+  padding: 0 7px;
+  border-radius: 20px;
+  background: #f4eaf4;
+  font-size: 12px;
+}
 
-  const reloadContacts=async()=>{
-    const {data,error}=await supabase.from('contacts').select('*').order('name')
-    if(error)setError(`Chargement des contacts impossible : ${error.message}`)
-    else setContacts(data||[])
-  }
-
-  useEffect(()=>{reloadContacts()},[])
-
-  const save=async data=>{
-    setBusy(true)
-    setError('')
-    const payload={
-      title:data.title.trim(),
-      event_date:data.event_date,
-      start_time:data.start_time||null,
-      end_time:data.end_time||null,
-      notes:data.notes||'',
-      catering:data.catering,
-      bar:data.bar,
-      production:data.production||{},
-      staffing:data.staffing||{},
-      groups:data.groups||[],
-      contacts:data.contacts||{}
-    }
-    const result=data.id
-      ? await supabase.from('events').update(payload).eq('id',data.id)
-      : await supabase.from('events').insert(payload)
-
-    setBusy(false)
-
-    if(result.error){
-      setError(result.error.message)
-      return
-    }
-
-    setEditing(null)
-    reload()
-  }
-
-  const remove=async e=>{
-    if(!confirm(`Supprimer « ${e.title} » ? Cette action est définitive.`))return
-    const {error}=await supabase.from('events').delete().eq('id',e.id)
-    if(error)setError(error.message)
-    else reload()
-  }
-
-  return (
-    <main className="admin-shell">
-      <header className="admin-top">
-        <div className="brand dark-brand">
-          <span className="brand-mark">S</span>
-          <div>
-            <b>BISTROT SAINT SAUVEUR</b>
-            <small>ADMINISTRATION</small>
-          </div>
-        </div>
-
-        <div className="admin-user">
-          <span>{user.email}</span>
-          <button className="btn secondary small" onClick={()=>setView(view==='settings'?'events':'settings')}>
-            <Settings size={14}/> Paramètres
-          </button>
-          <button className="btn secondary small" onClick={()=>setView(view==='contacts'?'events':'contacts')}>
-            <Contact size={14}/> Contacts
-          </button>
-          <button className="btn secondary small" onClick={signOut}>
-            <LogOut size={14}/> Déconnexion
-          </button>
-        </div>
-      </header>
-
-      <div className="admin-content">
-        {view==='settings'
-          ? <AdminSettings onBack={()=>setView('events')}/>
-          : view==='contacts'
-            ? <ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>
-            : <>
-                <div className="admin-heading">
-                  <div>
-                    <div className="eyebrow">GESTION DU PLANNING</div>
-                    <h1>Tous les événements</h1>
-                    <p>Consulte, crée, modifie ou supprime les fiches, passées comme futures.</p>
-                  </div>
-                  <button className="btn primary" onClick={()=>setEditing(structuredClone(emptyEvent))}>
-                    <Plus size={17}/> Nouvel événement
-                  </button>
-                </div>
-
-                {error&&<div className="error-box">{error}</div>}
-
-                <div className="admin-list">
-                  {allEvents.length
-                    ? allEvents.map(e=>(
-                        <article className="admin-event" key={e.id}>
-                          <div className="admin-date">
-                            <b>{format(parseISO(e.event_date),'dd')}</b>
-                            <span>{format(parseISO(e.event_date),'MMM yyyy',{locale:fr})}</span>
-                          </div>
-
-                          <div className="admin-event-main">
-                            <strong>{e.title}</strong>
-                            <small>
-                              {fmtDate(e.event_date)} · {e.start_time||'Horaire à préciser'}
-                              {e.end_time?` – ${e.end_time}`:''}
-                            </small>
-                            <div className="admin-tags">
-                              <span><Utensils size={13}/> {e.catering?.people||'Repas non précisés'} repas</span>
-                              <span><Wine size={13}/> {e.bar?.meal_tokens||0} jetons repas</span>
-                            </div>
-                          </div>
-
-                          <div className="admin-actions">
-                            <button className="icon-btn" title="Modifier" onClick={()=>setEditing(structuredClone(e))}>
-                              <Pencil/>
-                            </button>
-                            <button className="icon-btn danger" title="Supprimer" onClick={()=>remove(e)}>
-                              <Trash2/>
-                            </button>
-                          </div>
-                        </article>
-                      ))
-                    : <p className="empty">Aucun événement enregistré.</p>
-                  }
-                </div>
-
-                <p className="admin-footnote">
-                  {allEvents.length} événement{allEvents.length>1?'s':''} au total · Les modifications sont publiées immédiatement.
-                </p>
-              </>
-        }
-      </div>
-
-      {editing&&
-        <AdminForm
-          initial={editing}
-          onSave={save}
-          onCancel={()=>setEditing(null)}
-          busy={busy}
-          contacts={contacts}
-        />
-      }
-    </main>
-  )
+.admin-events-separator {
+  height: 1px;
+  background: #e8e3e8;
+  margin: 38px 0;
 }
 
 function Login({onLogin}) {
