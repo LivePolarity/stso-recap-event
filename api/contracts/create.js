@@ -1,4 +1,4 @@
-
+import { requireAdmin } from "./auth.js";
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
