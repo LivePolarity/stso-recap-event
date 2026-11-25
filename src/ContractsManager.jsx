@@ -14,10 +14,10 @@ const initialForm = {
   producteur_ape: "",
   producteur_representant: "",
   producteur_qualite: "",
+  signer_email: "",
   date_animation: "",
   duree_jours: "1",
   montant_ttc: "",
-  date_signature: new Date().toISOString().slice(0, 10),
 };
 
 function formatDate(date) {
@@ -30,7 +30,9 @@ export default function ContractsManager() {
   const [form, setForm] = useState(initialForm);
   const [documentBlob, setDocumentBlob] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const previewRef = useRef(null);
 
   function updateField(event) {
@@ -57,15 +59,14 @@ export default function ContractsManager() {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setMessage("");
     setDocumentBlob(null);
 
     try {
       const response = await fetch(TEMPLATE_URL);
 
       if (!response.ok) {
-        throw new Error(
-          "Modèle Word introuvable. Vérifie son emplacement et son nom dans public/templates."
-        );
+        throw new Error("Modèle Word introuvable dans public/templates.");
       }
 
       const content = await response.arrayBuffer();
@@ -79,7 +80,6 @@ export default function ContractsManager() {
       doc.render({
         ...form,
         date_animation: formatDate(form.date_animation),
-        date_signature: formatDate(form.date_signature),
         duree_jours: form.duree_jours,
         montant_ttc: form.montant_ttc,
       });
@@ -93,9 +93,7 @@ export default function ContractsManager() {
       setDocumentBlob(blob);
     } catch (err) {
       console.error(err);
-      setError(
-        err.message || "Une erreur est survenue pendant la génération du contrat."
-      );
+      setError(err.message || "Erreur pendant la génération du contrat.");
     } finally {
       setLoading(false);
     }
@@ -114,6 +112,57 @@ export default function ContractsManager() {
     URL.revokeObjectURL(url);
   }
 
+  async function saveAndSend() {
+    if (!documentBlob) return;
+
+    setSending(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(documentBlob);
+      });
+
+      const response = await fetch("/api/contracts/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          form,
+          file: base64,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Impossible d'enregistrer la convention.");
+      }
+
+      const sendResponse = await fetch("/api/contracts/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contractId: result.contractId }),
+      });
+
+      const sendResult = await sendResponse.json();
+
+      if (!sendResponse.ok) {
+        throw new Error(sendResult.error || "Impossible d'envoyer le lien.");
+      }
+
+      setMessage("Convention enregistrée. Le lien de signature a été envoyé au partenaire.");
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Une erreur est survenue.");
+    } finally {
+      setSending(false);
+    }
+  }
+
   const fields = [
     ["producteur_nom", "Nom du producteur", "text", true],
     ["producteur_adresse", "Adresse", "text", true],
@@ -122,6 +171,7 @@ export default function ContractsManager() {
     ["producteur_ape", "Code APE", "text", false],
     ["producteur_representant", "Nom du représentant", "text", true],
     ["producteur_qualite", "Agissant en qualité de", "text", true],
+    ["signer_email", "E-mail du signataire", "email", true],
   ];
 
   const inputStyle = {
@@ -148,18 +198,14 @@ export default function ContractsManager() {
       <form onSubmit={generateContract}>
         <h3>Informations du producteur</h3>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "16px",
-          }}
-        >
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "16px",
+        }}>
           {fields.map(([name, label, type, required]) => (
             <div key={name}>
-              <label style={labelStyle} htmlFor={name}>
-                {label}
-              </label>
+              <label style={labelStyle} htmlFor={name}>{label}</label>
               <input
                 id={name}
                 name={name}
@@ -175,17 +221,13 @@ export default function ContractsManager() {
 
         <h3 style={{ marginTop: "28px" }}>Informations de l'animation</h3>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "16px",
-          }}
-        >
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: "16px",
+        }}>
           <div>
-            <label style={labelStyle} htmlFor="date_animation">
-              Date de l'animation
-            </label>
+            <label style={labelStyle} htmlFor="date_animation">Date de l'animation</label>
             <input
               id="date_animation"
               name="date_animation"
@@ -198,9 +240,7 @@ export default function ContractsManager() {
           </div>
 
           <div>
-            <label style={labelStyle} htmlFor="duree_jours">
-              Durée (en jours)
-            </label>
+            <label style={labelStyle} htmlFor="duree_jours">Durée (en jours)</label>
             <input
               id="duree_jours"
               name="duree_jours"
@@ -229,21 +269,6 @@ export default function ContractsManager() {
               style={inputStyle}
             />
           </div>
-
-          <div>
-            <label style={labelStyle} htmlFor="date_signature">
-              Date de signature prévue
-            </label>
-            <input
-              id="date_signature"
-              name="date_signature"
-              type="date"
-              value={form.date_signature}
-              onChange={updateField}
-              required
-              style={inputStyle}
-            />
-          </div>
         </div>
 
         <button
@@ -263,40 +288,45 @@ export default function ContractsManager() {
         </button>
       </form>
 
-      {error && (
-        <p style={{ color: "#c62828", marginTop: "16px" }}>{error}</p>
-      )}
+      {error && <p style={{ color: "#c62828", marginTop: "16px" }}>{error}</p>}
+      {message && <p style={{ color: "#236b45", marginTop: "16px" }}>{message}</p>}
 
       {documentBlob && (
         <section style={{ marginTop: "36px" }}>
           <h3>Aperçu du contrat</h3>
-          <p>Vérifie attentivement le document avant de l'utiliser.</p>
+          <p>Vérifie le document avant de l'envoyer.</p>
 
-          <button
-            type="button"
-            onClick={downloadContract}
-            style={{
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button type="button" onClick={downloadContract} style={{
+              padding: "12px 20px",
+              background: "#555",
+              color: "white",
+              border: "none",
+              borderRadius: "6px",
+              cursor: "pointer",
+            }}>
+              Télécharger le contrat Word
+            </button>
+
+            <button type="button" onClick={saveAndSend} disabled={sending} style={{
               padding: "12px 20px",
               background: "#236b45",
               color: "white",
               border: "none",
               borderRadius: "6px",
-              cursor: "pointer",
-              marginBottom: "20px",
-            }}
-          >
-            Télécharger le contrat Word
-          </button>
+              cursor: sending ? "wait" : "pointer",
+            }}>
+              {sending ? "Envoi en cours..." : "Enregistrer et envoyer pour signature"}
+            </button>
+          </div>
 
-          <div
-            ref={previewRef}
-            style={{
-              background: "#eee",
-              padding: "16px",
-              borderRadius: "8px",
-              overflowX: "auto",
-            }}
-          />
+          <div ref={previewRef} style={{
+            background: "#eee",
+            padding: "16px",
+            borderRadius: "8px",
+            overflowX: "auto",
+            marginTop: "20px",
+          }} />
         </section>
       )}
     </div>
