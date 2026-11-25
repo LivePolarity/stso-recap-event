@@ -156,8 +156,11 @@ export default function ContractsManager({ supabase }) {
       }
 
       const sendResponse = await fetch("/api/contracts/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    ...(await getAuthHeaders()),
+  },
         body: JSON.stringify({ contractId: result.contractId }),
       });
 
