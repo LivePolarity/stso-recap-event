@@ -11,6 +11,9 @@ function json(res, status, data) {
 }
 
 export default async function handler(req, res) {
+  const auth = await requireAdmin(req, res);
+  if (!auth) return;
+
   if (req.method !== "POST") {
     return json(res, 405, { error: "Méthode non autorisée." });
   }
