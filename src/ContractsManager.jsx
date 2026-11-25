@@ -26,7 +26,7 @@ function formatDate(date) {
   return `${day}/${month}/${year}`;
 }
 
-export default function ContractsManager() {
+export default function ContractsManager({ supabase }) {
   const [form, setForm] = useState(initialForm);
   const [documentBlob, setDocumentBlob] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -34,6 +34,17 @@ export default function ContractsManager() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const previewRef = useRef(null);
+    async function getAuthHeaders() {
+    const { data: { session }, error } = await supabase.auth.getSession();
+
+    if (error || !session?.access_token) {
+      throw new Error("Session administrateur expirée. Reconnecte-toi.");
+    }
+
+    return {
+      Authorization: `Bearer ${session.access_token}`,
+    };
+  }
 
   function updateField(event) {
     const { name, value } = event.target;
