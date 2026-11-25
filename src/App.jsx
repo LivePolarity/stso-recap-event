@@ -390,7 +390,7 @@ function AdminPage({events,reload,user,signOut}) {
           : view==='contacts'
             ? <ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>
             : view==='contracts'
-              ? <ContractsManager/>
+              ? <ContractsManager supabase={supabase}/>
               : <AdminSettings onBack={()=>setView('events')}/>
         }
       </div>
