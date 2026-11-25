@@ -1,4 +1,4 @@
-
+import { requireAdmin } from "./auth.js";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes, createHash } from "node:crypto";
 
@@ -12,6 +12,8 @@ function json(res, status, data) {
 }
 
 export default async function handler(req, res) {
+  const auth = await requireAdmin(req, res);
+if (!auth) return;
   if (req.method !== "POST") {
     return json(res, 405, { error: "Méthode non autorisée." });
   }
