@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import ContractsManager from './ContractsManager'
 import { createClient } from '@supabase/supabase-js'
 import {
   addDays, addMonths, endOfMonth, endOfWeek, format, isSameDay, isSameMonth,
@@ -313,11 +314,17 @@ function AdminPage({events,reload,user,signOut}) {
 
         <div className="admin-user">
           <span>{user.email}</span>
-          <button className="btn secondary small" onClick={()=>setView(view==='settings'?'events':'settings')}>
-            <Settings size={14}/> Paramètres
+          <button className={`btn secondary small ${view==='events'?'active':''}`} onClick={()=>setView('events')}>
+            <CalendarDays size={14}/> Event
           </button>
-          <button className="btn secondary small" onClick={()=>setView(view==='contacts'?'events':'contacts')}>
+          <button className={`btn secondary small ${view==='contacts'?'active':''}`} onClick={()=>setView('contacts')}>
             <Contact size={14}/> Contacts
+          </button>
+          <button className={`btn secondary small ${view==='contracts'?'active':''}`} onClick={()=>setView('contracts')}>
+            <FileText size={14}/> Contrats
+          </button>
+          <button className={`btn secondary small ${view==='settings'?'active':''}`} onClick={()=>setView('settings')}>
+            <Settings size={14}/> Paramètres
           </button>
           <button className="btn secondary small" onClick={signOut}>
             <LogOut size={14}/> Déconnexion
@@ -326,11 +333,8 @@ function AdminPage({events,reload,user,signOut}) {
       </header>
 
       <div className="admin-content">
-        {view==='settings'
-          ? <AdminSettings onBack={()=>setView('events')}/>
-          : view==='contacts'
-            ? <ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>
-            : <>
+        {view==='events'
+          ? <>
                 <div className="admin-heading">
                   <div>
                     <div className="eyebrow">GESTION DU PLANNING</div>
@@ -383,6 +387,11 @@ function AdminPage({events,reload,user,signOut}) {
                   {allEvents.length} événement{allEvents.length>1?'s':''} au total · Les modifications sont publiées immédiatement.
                 </p>
               </>
+          : view==='contacts'
+            ? <ContactManager onBack={()=>setView('events')} contacts={contacts} reloadContacts={reloadContacts}/>
+            : view==='contracts'
+              ? <ContractsManager/>
+              : <AdminSettings onBack={()=>setView('events')}/>
         }
       </div>
 
